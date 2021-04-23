@@ -18,7 +18,8 @@ namespace GridTester
         private decimal _startPrice;
         private int _gridLotSize;
         private decimal _startingCash;
-        private decimal _startingStocksHeld;
+        private decimal _startingStocksHeldPercentForBot;
+        private bool _reinvestGridProfit;
 
         public GridTester(string fileName)
         {
@@ -31,9 +32,10 @@ namespace GridTester
             var trigger = decimal.Parse(ConfigurationManager.AppSettings["Trigger"]);
             var triggerDate = string.IsNullOrEmpty(ConfigurationManager.AppSettings["TriggerDate"]) ? DateTime.MinValue : DateTime.Parse(ConfigurationManager.AppSettings["TriggerDate"]);
             var gridLot = int.Parse(ConfigurationManager.AppSettings["GridLot"]);
-            var startingProfitPerGrid = decimal.Parse(ConfigurationManager.AppSettings["InitialGridProfit"]); ;
-            _startingCash = decimal.Parse(ConfigurationManager.AppSettings["StartingCash"]); ;
-            _startingStocksHeld = decimal.Parse(ConfigurationManager.AppSettings["StartingStocksHeld"]); ;
+            var startingProfitPerGrid = decimal.Parse(ConfigurationManager.AppSettings["InitialGridProfit"]);
+            _startingCash = decimal.Parse(ConfigurationManager.AppSettings["StartingCash"]);
+            _startingStocksHeldPercentForBot = decimal.Parse(ConfigurationManager.AppSettings["StartingStocksPercent"]);
+            _reinvestGridProfit = bool.Parse(ConfigurationManager.AppSettings["ReInvestGridProfit"]);
 
             if(triggerDate > DateTime.MinValue)
             {
@@ -55,7 +57,7 @@ namespace GridTester
             if (_stockList.Count == 0)
                 return;
 
-            var grid = new Grid(_low, _high, _gridGap, _gridQty, _gridLotSize, _startPrice, _startingCash, _startingStocksHeld, _stockList);
+            var grid = new Grid(_low, _high, _gridGap, _gridQty, _gridLotSize, _startPrice, _startingCash, _startingStocksHeldPercentForBot, _stockList, _reinvestGridProfit);
 
             grid.Initialize();
             grid.Run();
