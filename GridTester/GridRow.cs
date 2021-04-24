@@ -8,7 +8,7 @@
         {
             this.BuyPrice = buyPrice;
             this.gridGap = gridGap;
-            this.SellPrice = buyPrice + gridGap;
+            this.SellPrice = buyPrice + gridGap * 2;
         }
 
         public decimal BuyPrice { get; }

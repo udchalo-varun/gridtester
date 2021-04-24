@@ -20,6 +20,7 @@ namespace GridTester
         private decimal _startingCash;
         private decimal _startingStocksHeldPercentForBot;
         private bool _reinvestGridProfit;
+        private bool _isGridTypeGeometric;
 
         public GridTester(string fileName)
         {
@@ -36,6 +37,7 @@ namespace GridTester
             _startingCash = decimal.Parse(ConfigurationManager.AppSettings["StartingCash"]);
             _startingStocksHeldPercentForBot = decimal.Parse(ConfigurationManager.AppSettings["StartingStocksPercent"]);
             _reinvestGridProfit = bool.Parse(ConfigurationManager.AppSettings["ReInvestGridProfit"]);
+            _isGridTypeGeometric = ConfigurationManager.AppSettings["GridType"] == "G";
 
             if(triggerDate > DateTime.MinValue)
             {
@@ -46,8 +48,8 @@ namespace GridTester
 
             _low = trigger * (1 - variable);
             _high = trigger * (1 + variable);
-            _gridGap = decimal.Round(trigger * startingProfitPerGrid, 2);
-            _gridQty = (int)((_high - _low) / _gridGap);
+            _gridGap = _isGridTypeGeometric ? startingProfitPerGrid : decimal.Round(trigger * startingProfitPerGrid, 2);
+            _gridQty = (int)(_isGridTypeGeometric ? ((_high - _low) / _low / _gridGap) : ((_high - _low) / _gridGap));
             _startPrice = trigger;
             _gridLotSize = gridLot;
         }
@@ -57,7 +59,7 @@ namespace GridTester
             if (_stockList.Count == 0)
                 return;
 
-            var grid = new Grid(_low, _high, _gridGap, _gridQty, _gridLotSize, _startPrice, _startingCash, _startingStocksHeldPercentForBot, _stockList, _reinvestGridProfit);
+            var grid = new Grid(_low, _high, _gridGap, _gridQty, _gridLotSize, _startPrice, _startingCash, _startingStocksHeldPercentForBot, _stockList, _reinvestGridProfit, _isGridTypeGeometric);
 
             grid.Initialize();
             grid.Run();

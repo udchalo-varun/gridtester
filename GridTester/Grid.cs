@@ -16,6 +16,10 @@ namespace GridTester
         private readonly int gridLotSize;
         private readonly decimal startingCash;
         private decimal availableCash;
+
+        private string summaryFileName = "Output-Summary.csv";
+        public decimal OpenPrice { get; private set; }
+
         private readonly decimal startingStockHoldPercent;
         private List<GridRow> gridRows;
         //private List<string> logs = new List<string>();
@@ -34,12 +38,14 @@ namespace GridTester
         public DateTime OpenDate { get; private set; }
         public decimal CloseValue { get; private set; }
         public decimal HoDLCloseValue { get; private set; }
+        public decimal ClosePrice { get; private set; }
         public decimal OpenValue { get; private set; }
         public int OpenHoldHODLQuantity { get; private set; }
         public int OpenStocksQuantityForBot { get; private set; }
         public bool IsReinvestGridProfit { get; }
+        public bool IsGeometric { get; }
 
-        public Grid(decimal low, decimal high, decimal gridGap, int gridQty, int gridLotSize, decimal startPrice, decimal startingCash, decimal startingStockHoldPercent, List<StockDayInfo> tradingFile, bool isReinvestGridProfit)
+        public Grid(decimal low, decimal high, decimal gridGap, int gridQty, int gridLotSize, decimal startPrice, decimal startingCash, decimal startingStockHoldPercent, List<StockDayInfo> tradingFile, bool isReinvestGridProfit, bool isGeometric = true)
         {
             this.low = low;
             this.high = high;
@@ -48,6 +54,7 @@ namespace GridTester
             this.startPrice = startPrice;
             this.tradingFile = tradingFile;
             IsReinvestGridProfit = isReinvestGridProfit;
+            IsGeometric = isGeometric;
             this.gridLotSize = gridLotSize;
             this.startingCash = startingCash;
             this.availableCash = startingCash;
@@ -57,10 +64,18 @@ namespace GridTester
         internal void Initialize()
         {
             gridRows = new List<GridRow>();
-
+            
+            var currentVal = high;
             for (int i = gridQty - 1; i >= 0; i--)
             {
-                gridRows.Add(new GridRow(low + (i * gridGap), gridGap));
+                var gap = gridGap;
+                if (IsGeometric)
+                {
+                    gap = Math.Round(currentVal * gridGap, 2);
+                }
+                gridRows.Add(new GridRow(currentVal, gap));
+                currentVal = currentVal - gap;
+
             }
             this.OpenDate = tradingFile[0].Date;
 
@@ -86,10 +101,10 @@ namespace GridTester
             this.OpenValue = startingCash;
             this.OpenHoldHODLQuantity = (int)(startingCash / currentDay.OpenPrice);
             //reserve 4 lots worth of money for bot cash
-            var qtyToReserveForBotCash = gridLotSize * 4;
+            var qtyToReserveForBotCash = gridLotSize * 8;
             this.OpenStocksQuantityForBot = (int)(OpenHoldHODLQuantity - qtyToReserveForBotCash);
             this.availableCash = startingCash - OpenStocksQuantityForBot * currentDay.OpenPrice;
-            
+            OpenPrice = currentDay.OpenPrice;
             logsCsv.Add(this.CsvOpen());
 
             for (; i < tradingFile.Count; i++)
@@ -150,7 +165,7 @@ namespace GridTester
                     {
                         //Try to maintain at least 3 lots of next grid size available
                         //Get next higher grid to purchase
-                        var minBalance = trade.SellPrice * 4m * gridLotSize;
+                        var minBalance = trade.SellPrice * 8m * gridLotSize;
                         if (availableCash > minBalance)
                         {
                             //Buy extra shares at current price
@@ -192,6 +207,7 @@ namespace GridTester
             this.CloseDate = lastDay.Date;
             this.CloseValue = lastDay.ClosePrice * (OpenStocksQuantityForBot + GridProfitShares + AfterCloseSquareOffSharesHeld) + availableCash;
             this.HoDLCloseValue = lastDay.ClosePrice * OpenHoldHODLQuantity;
+            ClosePrice = lastDay.ClosePrice;
             //Display Grid Performance
             //logs.Add(this.Display());
             logsCsv.Add(this.CsvClose());
@@ -201,18 +217,28 @@ namespace GridTester
 
         private string CsvClose()
         {
-            var header = string.Join(",", "CloseDate", "Equity", "Action", "OpenValue", 
+            var header = string.Join(",", 
+                "StopLoss", "Target", "GridType", "GridGap", "StartEquity", "StartCash",
+                "OpenDate","OpenPrice", "CloseDate", "ClosePrice", "Equity", "Action", "OpenValue", 
                 "CloseValue", "P&L", "P&L%", 
                 "DaysRun",
                 "HoDLCloseValue", "HoDLP&L", "HoDLP&L%", 
                 "P&L vs HODL", "P&L vs HODL%", 
                 "numTrades", "GridProfitTotal", "GridProfitShares", "AvailableCash");
-            var item = string.Join(",", CloseDate, tradingFile[0].Equity, "Close", OpenValue, CloseValue,
+            var item = string.Join(",", 
+                low, high, IsGeometric ? "G" : "A", gridGap, OpenStocksQuantityForBot, startingCash,
+                OpenDate, OpenPrice, CloseDate, ClosePrice, tradingFile[0].Equity, "Close", OpenValue, CloseValue,
                 CloseValue - OpenValue, decimal.Round(100 * (CloseValue - OpenValue) / OpenValue, 2),
                 (int)CloseDate.Subtract(OpenDate).TotalDays,
                 HoDLCloseValue, HoDLCloseValue - OpenValue, decimal.Round(100 * (HoDLCloseValue - OpenValue) / OpenValue, 2),
                 CloseValue - HoDLCloseValue, decimal.Round(100 * (CloseValue - HoDLCloseValue) / HoDLCloseValue, 2),
                 numTrades, GridProfitTotal, GridProfitShares, availableCash);
+
+            if(!File.Exists(summaryFileName))
+                File.AppendAllText(summaryFileName, header + Environment.NewLine);
+
+            File.AppendAllText(summaryFileName, item + Environment.NewLine);
+
             return string.Join(Environment.NewLine, header, item);
         }
 
